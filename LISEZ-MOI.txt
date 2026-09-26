@@ -1,0 +1,17 @@
+MON INVENTAIRE
+Prototype gratuit sans serveur.
+
+Fonctions :
+- photo de l'objet
+- photo de l'emplacement
+- nom, catégorie, quantité, emplacement
+- galerie par catégorie
+- recherche
+- modification/suppression
+- sauvegarde et restauration JSON
+- fonctionnement hors ligne une fois installé
+
+Pour tester sur PC : servir ce dossier avec un petit serveur web.
+Pour Android/PWA : héberger ces 3 fichiers sur un hébergement HTTPS gratuit (par ex. GitHub Pages), puis ouvrir dans Chrome et choisir « Ajouter à l'écran d'accueil ».
+
+IMPORTANT : les données sont locales au navigateur. Utiliser régulièrement le bouton Sauvegarder.
