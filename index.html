@@ -13,7 +13,7 @@ main{padding:12px;max-width:900px;margin:auto}.cats{display:flex;gap:7px;overflo
 .card img{width:100%;height:150px;object-fit:cover;background:#ddd}.info{padding:10px}.name{font-weight:800}.meta{font-size:13px;color:#53606d;margin-top:4px}.empty{text-align:center;padding:50px 15px;color:#687582}
 dialog{width:min(94%,520px);border:0;border-radius:16px;padding:0}form{padding:16px}label{display:block;font-weight:700;margin:11px 0 5px}
 form input,form select{width:100%;padding:11px;border:1px solid #bbb;border-radius:9px;font-size:16px}.actions{display:flex;gap:8px;margin-top:16px}.actions button{flex:1}
-.thumbrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}.danger{background:#fee}.small{font-size:12px;color:#687582}
+.thumbrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}.danger{background:#fee}.small{font-size:12px;color:#687582}.placehint{font-size:12px;color:#687582;margin-top:5px}
 footer{padding:18px 12px;text-align:center}.backup{background:white;border:1px solid #ccc;margin:3px}
 @media(min-width:650px){.grid{grid-template-columns:repeat(4,1fr)}}
 </style></head>
@@ -25,7 +25,7 @@ footer{padding:18px 12px;text-align:center}.backup{background:white;border:1px s
 <label>Nom</label><input id="name" required placeholder="Ex. Scie sauteuse">
 <label>Catégorie</label><input id="category" list="catlist" required placeholder="Ex. Outillage électrique"><datalist id="catlist"></datalist>
 <label>Quantité</label><input id="qty" type="number" min="0" value="1" required>
-<label>Emplacement</label><input id="location" required placeholder="Ex. Garage / armoire / étagère 2">
+<label>Emplacement</label><input id="location" list="loclist" required placeholder="Choisir ou créer un emplacement"><datalist id="loclist"></datalist><div class="placehint" id="placehint">Les emplacements déjà utilisés seront proposés automatiquement.</div>
 <div class="thumbrow"><div><label>Photo objet</label><input id="photo" type="file" accept="image/*" capture="environment"></div><div><label>Photo emplacement</label><input id="placephoto" type="file" accept="image/*" capture="environment"></div></div>
 <div class="actions"><button type="button" id="cancel">Annuler</button><button type="submit" class="add">Enregistrer</button></div>
 <div class="actions" id="editActions" hidden><button type="button" class="danger" id="delete">Supprimer cet objet</button></div>
@@ -35,9 +35,13 @@ const KEY='inventaire-v1'; let data=JSON.parse(localStorage.getItem(KEY)||'[]'),
 const $=x=>document.getElementById(x); const save=()=>{localStorage.setItem(KEY,JSON.stringify(data));render()};
 const esc=s=>(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function cats(){return [...new Set(data.map(x=>x.category).filter(Boolean))].sort()}
+function locations(){return [...new Set(data.map(x=>x.location).filter(Boolean))].sort()}
+function placePhotoFor(location,excludeId=''){let key=(location||'').trim().toLowerCase();if(!key)return '';let x=data.find(v=>v.id!=excludeId&&(v.location||'').trim().toLowerCase()===key&&v.placephoto);return x?x.placephoto:''}
+function updatePlaceHint(){let id=$('id').value,p=placePhotoFor($('location').value,id);$('placehint').textContent=p?'📷 Photo de cet emplacement déjà enregistrée : elle sera réutilisée.':'Les emplacements déjà utilisés sont proposés automatiquement.'}
 function render(){
  let cs=['Tous',...cats()]; $('cats').innerHTML=cs.map(c=>`<button class="cat ${filter==c?'on':''}" data-c="${esc(c)}">${esc(c)}</button>`).join('');
  $('catlist').innerHTML=cats().map(c=>`<option value="${esc(c)}">`).join('');
+ $('loclist').innerHTML=locations().map(l=>`<option value="${esc(l)}">`).join('');
  document.querySelectorAll('.cat').forEach(b=>b.onclick=()=>{filter=b.dataset.c;render()});
  let q=$('q').value.toLowerCase(); let rows=data.filter(x=>(filter==='Tous'||x.category===filter)&&(`${x.name} ${x.location} ${x.category}`.toLowerCase().includes(q)));
  $('empty').hidden=rows.length>0; $('grid').innerHTML=rows.map(x=>`<div class="card" data-id="${x.id}">
@@ -47,9 +51,9 @@ function render(){
 }
 async function img(file){if(!file)return ''; return new Promise(ok=>{let r=new FileReader();r.onload=()=>{let im=new Image();im.onload=()=>{let max=900,sc=Math.min(1,max/Math.max(im.width,im.height)),cv=document.createElement('canvas');cv.width=im.width*sc;cv.height=im.height*sc;cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);ok(cv.toDataURL('image/jpeg',.72))};im.src=r.result};r.readAsDataURL(file)})}
 function reset(){ $('form').reset();$('qty').value=1;$('id').value='';$('editActions').hidden=true;$('ft').textContent='Ajouter un objet'}
-$('new').onclick=()=>{reset();$('dlg').showModal()}; $('cancel').onclick=()=>$('dlg').close(); $('q').oninput=render;
-function openEdit(id){let x=data.find(v=>v.id==id); if(!x)return; reset(); $('id').value=x.id;$('name').value=x.name;$('category').value=x.category;$('qty').value=x.qty;$('location').value=x.location;$('editActions').hidden=false;$('ft').textContent='Modifier';$('dlg').showModal()}
-$('form').onsubmit=async e=>{e.preventDefault();let id=$('id').value,old=data.find(x=>x.id==id)||{};let o={id:id||Date.now().toString(),name:$('name').value.trim(),category:$('category').value.trim(),qty:+$('qty').value,location:$('location').value.trim(),photo:old.photo||'',placephoto:old.placephoto||''};if($('photo').files[0])o.photo=await img($('photo').files[0]);if($('placephoto').files[0])o.placephoto=await img($('placephoto').files[0]); if(id)data=data.map(x=>x.id==id?o:x);else data.push(o);save();$('dlg').close()};
+$('new').onclick=()=>{reset();updatePlaceHint();$('dlg').showModal()}; $('cancel').onclick=()=>$('dlg').close(); $('q').oninput=render; $('location').oninput=updatePlaceHint; $('location').onchange=updatePlaceHint;
+function openEdit(id){let x=data.find(v=>v.id==id); if(!x)return; reset(); $('id').value=x.id;$('name').value=x.name;$('category').value=x.category;$('qty').value=x.qty;$('location').value=x.location;$('editActions').hidden=false;$('ft').textContent='Modifier';updatePlaceHint();$('dlg').showModal()}
+$('form').onsubmit=async e=>{e.preventDefault();let id=$('id').value,old=data.find(x=>x.id==id)||{},location=$('location').value.trim();let inherited=placePhotoFor(location,id);let sameOldLocation=(old.location||'').trim().toLowerCase()===location.toLowerCase();let o={id:id||Date.now().toString(),name:$('name').value.trim(),category:$('category').value.trim(),qty:+$('qty').value,location,photo:old.photo||'',placephoto:sameOldLocation?(old.placephoto||inherited):(inherited||'')};if($('photo').files[0])o.photo=await img($('photo').files[0]);if($('placephoto').files[0])o.placephoto=await img($('placephoto').files[0]); if(id)data=data.map(x=>x.id==id?o:x);else data.push(o);save();$('dlg').close()};
 $('delete').onclick=()=>{let id=$('id').value;if(confirm('Supprimer cet objet ?')){data=data.filter(x=>x.id!=id);save();$('dlg').close()}};
 $('export').onclick=()=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:'application/json'}));a.download='inventaire-sauvegarde.json';a.click()};
 $('importBtn').onclick=()=>$('import').click();$('import').onchange=e=>{let r=new FileReader();r.onload=()=>{try{let d=JSON.parse(r.result);if(Array.isArray(d)&&confirm('Remplacer les données actuelles par cette sauvegarde ?')){data=d;save()}}catch{alert('Sauvegarde invalide')}};r.readAsText(e.target.files[0])};
