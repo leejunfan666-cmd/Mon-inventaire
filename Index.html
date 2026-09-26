@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#17212b"><link rel="manifest" href="manifest.json">
+<title>Mon Inventaire</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:#f3f5f7;color:#17212b}
+header{position:sticky;top:0;background:#17212b;color:white;padding:14px;z-index:3}
+h1{font-size:20px;margin:0 0 10px}.bar{display:flex;gap:8px}.bar input{flex:1;padding:12px;border:0;border-radius:10px;font-size:16px}
+button{border:0;border-radius:10px;padding:11px 13px;font-weight:700}.add{background:#ffd54a}
+main{padding:12px;max-width:900px;margin:auto}.cats{display:flex;gap:7px;overflow:auto;padding-bottom:10px}
+.cat{white-space:nowrap;background:white;border:1px solid #ddd}.cat.on{background:#17212b;color:white}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.card{background:white;border-radius:14px;overflow:hidden;box-shadow:0 1px 5px #0002}
+.card img{width:100%;height:150px;object-fit:cover;background:#ddd}.info{padding:10px}.name{font-weight:800}.meta{font-size:13px;color:#53606d;margin-top:4px}.empty{text-align:center;padding:50px 15px;color:#687582}
+dialog{width:min(94%,520px);border:0;border-radius:16px;padding:0}form{padding:16px}label{display:block;font-weight:700;margin:11px 0 5px}
+form input,form select{width:100%;padding:11px;border:1px solid #bbb;border-radius:9px;font-size:16px}.actions{display:flex;gap:8px;margin-top:16px}.actions button{flex:1}
+.thumbrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}.danger{background:#fee}.small{font-size:12px;color:#687582}.placehint{font-size:12px;color:#687582;margin-top:5px}
+footer{padding:18px 12px;text-align:center}.backup{background:white;border:1px solid #ccc;margin:3px}
+@media(min-width:650px){.grid{grid-template-columns:repeat(4,1fr)}}
+</style></head>
+<body><header><h1>📦 Mon Inventaire</h1><div class="bar"><input id="q" placeholder="🔍 Rechercher un objet ou emplacement"><button class="add" id="new">＋</button></div></header>
+<main><div class="cats" id="cats"></div><div class="grid" id="grid"></div><div class="empty" id="empty">Aucun objet. Appuie sur ＋ pour commencer.</div></main>
+<footer><button class="backup" id="export">Sauvegarder</button><button class="backup" id="importBtn">Restaurer</button><input type="file" id="import" accept=".json" hidden><div class="small">Données stockées sur cet appareil. Fais régulièrement une sauvegarde.</div></footer>
+<dialog id="dlg"><form id="form">
+<h2 id="ft">Ajouter un objet</h2><input type="hidden" id="id">
+<label>Nom</label><input id="name" required placeholder="Ex. Scie sauteuse">
+<label>Catégorie</label><input id="category" list="catlist" required placeholder="Ex. Outillage électrique"><datalist id="catlist"></datalist>
+<label>Quantité</label><input id="qty" type="number" min="0" value="1" required>
+<label>Emplacement</label><input id="location" list="loclist" required placeholder="Choisir ou créer un emplacement"><datalist id="loclist"></datalist><div class="placehint" id="placehint">Les emplacements déjà utilisés seront proposés automatiquement.</div>
+<div class="thumbrow"><div><label>Photo objet</label><input id="photo" type="file" accept="image/*" capture="environment"></div><div><label>Photo emplacement</label><input id="placephoto" type="file" accept="image/*" capture="environment"></div></div>
+<div class="actions"><button type="button" id="cancel">Annuler</button><button type="submit" class="add">Enregistrer</button></div>
+<div class="actions" id="editActions" hidden><button type="button" class="danger" id="delete">Supprimer cet objet</button></div>
+</form></dialog>
+<script>
+const KEY='inventaire-v1'; let data=JSON.parse(localStorage.getItem(KEY)||'[]'), filter='Tous';
+const $=x=>document.getElementById(x); const save=()=>{localStorage.setItem(KEY,JSON.stringify(data));render()};
+const esc=s=>(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+function cats(){return [...new Set(data.map(x=>x.category).filter(Boolean))].sort()}
+function locations(){return [...new Set(data.map(x=>x.location).filter(Boolean))].sort()}
+function placePhotoFor(location,excludeId=''){let key=(location||'').trim().toLowerCase();if(!key)return '';let x=data.find(v=>v.id!=excludeId&&(v.location||'').trim().toLowerCase()===key&&v.placephoto);return x?x.placephoto:''}
+function updatePlaceHint(){let id=$('id').value,p=placePhotoFor($('location').value,id);$('placehint').textContent=p?'📷 Photo de cet emplacement déjà enregistrée : elle sera réutilisée.':'Les emplacements déjà utilisés sont proposés automatiquement.'}
+function render(){
+ let cs=['Tous',...cats()]; $('cats').innerHTML=cs.map(c=>`<button class="cat ${filter==c?'on':''}" data-c="${esc(c)}">${esc(c)}</button>`).join('');
+ $('catlist').innerHTML=cats().map(c=>`<option value="${esc(c)}">`).join('');
+ $('loclist').innerHTML=locations().map(l=>`<option value="${esc(l)}">`).join('');
+ document.querySelectorAll('.cat').forEach(b=>b.onclick=()=>{filter=b.dataset.c;render()});
+ let q=$('q').value.toLowerCase(); let rows=data.filter(x=>(filter==='Tous'||x.category===filter)&&(`${x.name} ${x.location} ${x.category}`.toLowerCase().includes(q)));
+ $('empty').hidden=rows.length>0; $('grid').innerHTML=rows.map(x=>`<div class="card" data-id="${x.id}">
+ ${x.photo?`<img src="${x.photo}">`:`<div style="height:150px;display:grid;place-items:center;font-size:44px">📦</div>`}
+ <div class="info"><div class="name">${esc(x.name)} ${x.qty>1?`× ${x.qty}`:''}</div><div class="meta">${esc(x.category)}</div><div class="meta">📍 ${esc(x.location)}</div>${x.placephoto?`<div class="meta">📷 Photo emplacement disponible</div>`:''}</div></div>`).join('');
+ document.querySelectorAll('.card').forEach(c=>c.onclick=()=>openEdit(c.dataset.id));
+}
+async function img(file){if(!file)return ''; return new Promise(ok=>{let r=new FileReader();r.onload=()=>{let im=new Image();im.onload=()=>{let max=900,sc=Math.min(1,max/Math.max(im.width,im.height)),cv=document.createElement('canvas');cv.width=im.width*sc;cv.height=im.height*sc;cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);ok(cv.toDataURL('image/jpeg',.72))};im.src=r.result};r.readAsDataURL(file)})}
+function reset(){ $('form').reset();$('qty').value=1;$('id').value='';$('editActions').hidden=true;$('ft').textContent='Ajouter un objet'}
+$('new').onclick=()=>{reset();updatePlaceHint();$('dlg').showModal()}; $('cancel').onclick=()=>$('dlg').close(); $('q').oninput=render; $('location').oninput=updatePlaceHint; $('location').onchange=updatePlaceHint;
+function openEdit(id){let x=data.find(v=>v.id==id); if(!x)return; reset(); $('id').value=x.id;$('name').value=x.name;$('category').value=x.category;$('qty').value=x.qty;$('location').value=x.location;$('editActions').hidden=false;$('ft').textContent='Modifier';updatePlaceHint();$('dlg').showModal()}
+$('form').onsubmit=async e=>{e.preventDefault();let id=$('id').value,old=data.find(x=>x.id==id)||{},location=$('location').value.trim();let inherited=placePhotoFor(location,id);let sameOldLocation=(old.location||'').trim().toLowerCase()===location.toLowerCase();let o={id:id||Date.now().toString(),name:$('name').value.trim(),category:$('category').value.trim(),qty:+$('qty').value,location,photo:old.photo||'',placephoto:sameOldLocation?(old.placephoto||inherited):(inherited||'')};if($('photo').files[0])o.photo=await img($('photo').files[0]);if($('placephoto').files[0])o.placephoto=await img($('placephoto').files[0]); if(id)data=data.map(x=>x.id==id?o:x);else data.push(o);save();$('dlg').close()};
+$('delete').onclick=()=>{let id=$('id').value;if(confirm('Supprimer cet objet ?')){data=data.filter(x=>x.id!=id);save();$('dlg').close()}};
+$('export').onclick=()=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:'application/json'}));a.download='inventaire-sauvegarde.json';a.click()};
+$('importBtn').onclick=()=>$('import').click();$('import').onchange=e=>{let r=new FileReader();r.onload=()=>{try{let d=JSON.parse(r.result);if(Array.isArray(d)&&confirm('Remplacer les données actuelles par cette sauvegarde ?')){data=d;save()}}catch{alert('Sauvegarde invalide')}};r.readAsText(e.target.files[0])};
+render();
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
+</script></body></html>
